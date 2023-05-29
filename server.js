@@ -3,8 +3,9 @@ import cors from "cors";
 import mongoose from "mongoose";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
+import nodemailer from "nodemailer";
 
-const mongoUrl = process.env.MONGO_URL || "mongodb://127.0.0.1/project-auth";
+const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/ ";
 mongoose.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true });
 mongoose.Promise = Promise;
 
@@ -25,6 +26,16 @@ app.get("/", (req, res) => {
   res.send("Hello Technigo!");
 });
 
+// create reusable transporter object using the default SMTP transport
+
+let transporter = nodemailer.createTransport({
+  service: 'gmail', // replace with your email service
+  auth: {
+    user: process.env.EMAIL, // replace with your email
+    pass: process.env.PASSWORD, // replace with your email password
+  },
+});
+
 const { Schema } = mongoose;
 const UserSchema = new mongoose.Schema({
   username: {
@@ -39,6 +50,19 @@ const UserSchema = new mongoose.Schema({
     required: true,
     minLength: 6
   },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  verified: {
+    type: Boolean,
+    default: false,
+  },
+  verificationToken: {
+    type: String,
+    unique: true,
+  },
   accessToken: {
     type: String,
     default: () => crypto.randomBytes(128).toString('hex')
@@ -49,12 +73,13 @@ const User = mongoose.model("User", UserSchema);
 
 // CREATE REGISTRATION
 app.post("/register", async (req, res) => {
-  const {username, password} = req.body;
+  const {username, password, email} = req.body;
 
   try {
 const salt = bcrypt.genSaltSync();
 const newUser = await new User({
   username: username,
+  email: email,
   password: bcrypt.hashSync(password, salt)
 }).save();
 res.status(201).json({
