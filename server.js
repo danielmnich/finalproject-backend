@@ -9,7 +9,13 @@ const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/ ";
 mongoose.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true });
 mongoose.Promise = Promise;
 
-
+/*/register - POST - pretty self-explanatory - Irro
+/login - POST - as above(typ färdig)
+/user/:userId - GET - get single user - doesn't matter if it's a mentee or a mentor
+/user/:userId - PATCH - update single user - their preferences or whatever you need
+/user/:userId - DELETE - deletes single user
+/users - GET - get a list of users - here if you are a mentor you get a list of mentees if you are a mentee you get a list of mentors, additionally if you want to expand on that you can show only the users with matching preferences
+/match - PATCH - match a user - this can be done in 2 ways - either only one person decides, or both need to be interested and then it's a match */
 
 // Defines the port the app will run on. Defaults to 8080, but can be overridden
 // when starting the server. Example command to overwrite PORT env variable value:
@@ -26,15 +32,6 @@ app.get("/", (req, res) => {
   res.send("Hello Technigo!");
 });
 
-// create reusable transporter object using the default SMTP transport
-
-let transporter = nodemailer.createTransport({
-  service: 'gmail', // replace with your email service
-  auth: {
-    user: process.env.EMAIL, // replace with your email
-    pass: process.env.PASSWORD, // replace with your email password
-  },
-});
 
 const { Schema } = mongoose;
 const UserSchema = new mongoose.Schema({
@@ -59,6 +56,10 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  preferences:{
+    type: [String], //this makes it an array
+  },
+
   verificationToken: {
     type: String,
     unique: true,
@@ -127,6 +128,27 @@ app.post("/login", async (req, res) => {
     });
   }
 });
+
+app.get('/preferences', async (req, res) => {
+  try {
+    const users = await User.find();
+    const preferences = users.map(user => user.preferences).flat();
+    const uniquePreferences = [...new Set(preferences)];
+
+    res.status(200).json({
+      success: true,
+      response: {
+        preferences: uniquePreferences,
+      }
+    });
+  } catch(e) {
+    res.status(500).json({
+      success: false,
+      response: e
+    });
+  }
+});
+
 
 const SecretSchema = new mongoose.Schema({
   message: {
@@ -198,7 +220,7 @@ app.get("/secrets", async (req, res) => {
 });
 
 
-/*
+
 app.get("/secrets", authenticateUser);
 app.get("/secrets", async(req, res) => {
   try {
@@ -216,7 +238,6 @@ app.get("/secrets", async(req, res) => {
     });
   }
 });
-*/
 
 app.post("/secrets", authenticateUser);
 app.post("/secrets", async (req, res) => {
