@@ -4,6 +4,9 @@ import mongoose from "mongoose";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 import validator from 'validator';
+import { error } from "console";
+const multer = require('multer');
+const path = require('path');
 
 const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/ ";
 mongoose.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true });
@@ -33,6 +36,7 @@ app.get("/", (req, res) => {
   res.send("Hello Technigo!");
 });
 
+// user och preferences
 const PreferenceSchema = new mongoose.Schema({
   preference: {
     type: String,
@@ -252,9 +256,7 @@ app.delete("/user/:userId", async (req, res) => {
   }
 });
 
-
-
-// where do we put the preferences that we wanted to use for matching?
+//  preferences - GET - get all preferences
 app.get('/preferences', async (req, res) => {
   try {
     const users = await User.find();
@@ -271,6 +273,94 @@ app.get('/preferences', async (req, res) => {
     res.status(500).json({
       success: false,
       response: e
+    });
+  }
+});
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/')
+  },
+  filename: function(req, file, cb) {
+ const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+ const fileExtension = path.extname(file.originalname)
+  cb(null, file.fieldname + '-' + uniqueSuffix + fileExtension) 
+  }
+})
+const upload = multer({ storage: storage })
+
+// Endpoint for uploading a profile picture
+app.post('/user/:userId/upload-profile-picture', upload.single('profilePicture'), async (req, res) => {
+  const userId = req.params.userId;
+  const profilePicture = req.file;
+
+  // Update the user's profile picture in the database
+  try {
+    await User.findOneAndUpdate(
+      { _id: userId },
+      { profilePicture: profilePicture.filename }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile picture uploaded successfully',
+      file: profilePicture
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to upload profile picture',
+      error: error.message
+    });
+  }
+});
+
+// Endpoint for deleting a profile picture
+app.delete('/user/:userId/delete-profile-picture', async (req, res) => {
+  const userId = req.params.userId;
+
+  // Update the user's profile picture in the database
+  try {
+    await User.findOneAndUpdate(
+      { _id: userId },
+      { profilePicture: null }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile picture deleted successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete profile picture',
+      error: error.message
+    });
+  }
+});
+
+// Endpoint for changing a profile picture
+app.patch('/user/:userId/change-profile-picture', upload.single('profilePicture'), async (req, res) => {
+  const userId = req.params.userId;
+  const profilePicture = req.file;
+
+  // Update the user's profile picture in the database
+  try {
+    await User.findOneAndUpdate(
+      { _id: userId },
+      { profilePicture: profilePicture.filename }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile picture changed successfully',
+      file: profilePicture
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to change profile picture',
+      error: error.message
     });
   }
 });
