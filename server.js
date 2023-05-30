@@ -218,7 +218,40 @@ res.status(500).json({
 });
 
 
+app.delete("/user/:userId", async (req, res) => {
+  const { firstName, lastName, password, email, username } = req.body;
+  try {
+const user = await User.findOneAndUpdate( {_id: req.params.userId}, {
 
+  firstName: firstName,
+  lastName: lastName,
+  password: password,
+  email: email,
+  username: username
+}, {new: true});
+if (user) {
+  res.status(200).json({
+    success: true,
+    response: {
+      username: user.username,
+      id: user._id,
+      preferences: user.preferences,
+      message: "User updated"
+    }
+  });
+} else {
+  res.status(400).json({
+    success: false,
+    response: "User not found"
+  });
+}
+} catch (e) {
+res.status(500).json({
+  success: false,
+  response: e
+});
+}
+});
 
 
 // where do we put the preferences that we wanted to use for matching?
