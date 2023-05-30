@@ -33,6 +33,13 @@ app.get("/", (req, res) => {
   res.send("Hello Technigo!");
 });
 
+const PreferenceSchema = new mongoose.Schema({
+  preference: {
+    type: String,
+    required: true,
+    enum: ["mentor", "mentee", "fullstack", "frontend", "backend", "react", "javascript", "python", "java", "c++", "c#", "ruby", "php", "sql", "html", "css", "node", "angular", "vue", "swift", "kotlin", "flutter", "react native", "android", "ios", "unity"]
+  }
+});
 
 const UserSchema = new mongoose.Schema({
   username: {
@@ -64,7 +71,7 @@ const UserSchema = new mongoose.Schema({
     default: false,
   },
   preferences: {
-    type: [String],
+    type: [PreferenceSchema],
   },
   verificationToken: {
     type: String,
@@ -75,7 +82,6 @@ const UserSchema = new mongoose.Schema({
     default: () => crypto.randomBytes(128).toString('hex')
   }
 });
-
 
 const User = mongoose.model("User", UserSchema);
 
@@ -183,7 +189,7 @@ try {
 // /user/:userId - PATCH - update single user - their preferences or whatever you need
 
 app.patch("/user/:userId", async (req, res) => {
-  const { firstName, lastName, password, email, username } = req.body;
+  const { firstName, lastName, password, email, username, preference } = req.body;
   try {
 const user = await User.findOneAndUpdate( {_id: req.params.userId}, {
 
@@ -191,7 +197,8 @@ const user = await User.findOneAndUpdate( {_id: req.params.userId}, {
   lastName: lastName,
   password: password,
   email: email,
-  username: username
+  username: username,
+  preference: preference
 }, {new: true});
 if (user) {
   res.status(200).json({
@@ -244,10 +251,6 @@ app.delete("/user/:userId", async (req, res) => {
     });
   }
 });
-
-
-
-
 
 
 
