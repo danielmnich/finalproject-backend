@@ -9,13 +9,14 @@ const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/ ";
 mongoose.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true });
 mongoose.Promise = Promise;
 
-/*/register - POST - pretty self-explanatory - Irro
-/login - POST - as above(typ färdig)
-/user/:userId - GET - get single user - doesn't matter if it's a mentee or a mentor
+/*/register - POST - pretty self-explanatory - Irro Färdigt- this is also create a user?
+/login - POST - as above(typ färdig) - Irro Färdigt
+/user/:userId - GET - get single user - doesn't matter if it's a mentee or a mentor Färdigt
 /user/:userId - PATCH - update single user - their preferences or whatever you need
 /user/:userId - DELETE - deletes single user
 /users - GET - get a list of users - here if you are a mentor you get a list of mentees if you are a mentee you get a list of mentors, additionally if you want to expand on that you can show only the users with matching preferences
 /match - PATCH - match a user - this can be done in 2 ways - either only one person decides, or both need to be interested and then it's a match */
+// preferences - GET - get a list of all preferences 
 
 // Defines the port the app will run on. Defaults to 8080, but can be overridden
 // when starting the server. Example command to overwrite PORT env variable value:
@@ -33,7 +34,6 @@ app.get("/", (req, res) => {
 });
 
 
-const { Schema } = mongoose;
 const UserSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -42,10 +42,17 @@ const UserSchema = new mongoose.Schema({
     minLength: 2,
     maxLength: 30
   },
+  firstName: {
+    type: String,
+    required: true,
+  },
+  lastName: {
+    type: String,
+    required: true,
+  },
   password: {
     type: String,
     required: true
-    
   },
   email: {
     type: String,
@@ -56,10 +63,9 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
-  preferences:{
-    type: [String], //this makes it an array
+  preferences: {
+    type: [String],
   },
-
   verificationToken: {
     type: String,
     unique: true,
@@ -70,11 +76,12 @@ const UserSchema = new mongoose.Schema({
   }
 });
 
+
 const User = mongoose.model("User", UserSchema);
 
 // CREATE REGISTRATION - Irro- // e mail går även att använda i login
 app.post("/register", async (req, res) => {
-  const {username, password, email} = req.body;
+  const {username, password, email, lastName, firstName} = req.body;
 
   if (!validator.isEmail(email)) {
     res.status(400).json({message: "Please enter a valid email address"});
@@ -91,6 +98,8 @@ app.post("/register", async (req, res) => {
     const newUser = await new User({
       username: username,
       email: email,
+      firstName: firstName,
+      lastName: lastName,
       password: bcrypt.hashSync(password, salt)
     }).save();
     
@@ -140,6 +149,76 @@ app.post("/login", async (req, res) => {
     });
   }
 });
+
+// /user/:userId - GET - get single user - doesn't matter if it's a mentee or a mentor
+// below is an endpoint to get a single user
+app.get("/user/:userId", async (req, res) => {
+try {
+  const user = await User.findOne({_id: req.params.userId})
+  if (user) {
+    res.status(200).json({
+      success: true,
+      response: {
+        username: user.username,
+        id: user._id,
+        preferences: user.preferences,
+        message: "User found"
+      }
+    });
+  } else {
+    res.status(400).json({
+      success: false,
+      response: "User not found"
+    });
+  }
+} catch (e) {
+  res.status(500).json({
+    success: false,
+    response: e
+  });
+}
+});
+
+
+// /user/:userId - PATCH - update single user - their preferences or whatever you need
+
+app.patch("/user/:userId", async (req, res) => {
+  const { firstName, lastName, password, email, username } = req.body;
+  try {
+const user = await User.findOneAndUpdate( {_id: req.params.userId}, {
+
+  firstName: firstName,
+  lastName: lastName,
+  password: password,
+  email: email,
+  username: username
+}, {new: true});
+if (user) {
+  res.status(200).json({
+    success: true,
+    response: {
+      username: user.username,
+      id: user._id,
+      preferences: user.preferences,
+      message: "User updated"
+    }
+  });
+} else {
+  res.status(400).json({
+    success: false,
+    response: "User not found"
+  });
+}
+} catch (e) {
+res.status(500).json({
+  success: false,
+  response: e
+});
+}
+});
+
+
+
 
 
 // where do we put the preferences that we wanted to use for matching?
