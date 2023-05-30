@@ -4,7 +4,6 @@ import mongoose from "mongoose";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 import validator from 'validator';
-import { error } from "console";
 const multer = require('multer');
 const path = require('path');
 
@@ -80,6 +79,10 @@ const UserSchema = new mongoose.Schema({
   verificationToken: {
     type: String,
     unique: true,
+  },
+  bio: {
+    type: String,
+    default: ''
   },
   accessToken: {
     type: String,
@@ -366,12 +369,12 @@ app.patch('/user/:userId/change-profile-picture', upload.single('profilePicture'
 });
 
 
-const SecretSchema = new mongoose.Schema({
+const BioSchema = new mongoose.Schema({
   message: {
     type: String,
     required: true,
     minLength: 2,
-    maxLength: 150
+    maxLength: 200
   },
   createdAt: {
     type: Date,
@@ -383,7 +386,7 @@ const SecretSchema = new mongoose.Schema({
   }
 });
 
-const Secret = mongoose.model("Secrets", SecretSchema);
+const Secret = mongoose.model("Bio", BioSchema);
 
 // Authenticate the user
 const authenticateUser = async (req, res, next) => {
@@ -407,17 +410,17 @@ const authenticateUser = async (req, res, next) => {
   }
 }
 
-app.get("/secrets", authenticateUser);
-app.get("/secrets", async (req, res) => {
+app.get("/bio", authenticateUser);
+app.get("/bio", async (req, res) => {
   try {
     const accessToken = req.header("Authorization");
     const user = await User.findOne({ accessToken: accessToken })
 
     if (user) {
-      const secrets = await Secret.find({ username: user._id }).sort({ createdAt: -1 }).limit(20)
+      const bio = await Bio.find({ username: user._id }).sort({ createdAt: -1 }).limit(20)
       res.status(200).json({
         success: true,
-        response: secrets,
+        response: bio,
       });
     } else {
       res.status(401).json({
@@ -437,8 +440,8 @@ app.get("/secrets", async (req, res) => {
 
 
 
-app.get("/secrets", authenticateUser);
-app.get("/secrets", async(req, res) => {
+app.get("/bio", authenticateUser);
+app.get("/bio", async(req, res) => {
   try {
     const accessToken = req.header("Authorization");
     const secrets = await Secret.find({});
@@ -455,8 +458,8 @@ app.get("/secrets", async(req, res) => {
   }
 });
 
-app.post("/secrets", authenticateUser);
-app.post("/secrets", async (req, res) => {
+app.post("/bio", authenticateUser);
+app.post("/bio", async (req, res) => {
   try {
     const { message } = req.body;
     const accessToken = req.header("Authorization");
@@ -464,8 +467,6 @@ app.post("/secrets", async (req, res) => {
     const secrets = await new Secret({
       message: message, 
       username: user._id
-      // username: username
-      // username: username._id
     }).save();
     res.status(201).json({
       success: true, 
@@ -479,6 +480,41 @@ app.post("/secrets", async (req, res) => {
     });
   }
 })
+
+app.put("/bio", authenticateUser);
+app.put("/bio", async (req, res) => {
+  try {
+    const { message } = req.body;
+    const accessToken = req.header("Authorization");
+    const user = await User.findOne({accessToken: accessToken});
+    
+    // Find and update the bio, returning the updated bio
+    const updatedBio = await Bio.findOneAndUpdate(
+      { username: user._id }, // Find bio by user's _id
+      { message: message }, // Update the message
+      { new: true } // Option to return the updated document
+    );
+    
+    if (!updatedBio) {
+      return res.status(404).json({
+        success: false, 
+        response: "Bio not found", 
+      });
+    }
+    
+    res.status(200).json({
+      success: true, 
+      response: updatedBio
+    });
+    
+  } catch (e) {
+    res.status(500).json({
+      success: false, 
+      response: e, 
+      message: "An error occurred"
+    });
+  }
+});
 
 
 
