@@ -3,7 +3,7 @@ import cors from "cors";
 import mongoose from "mongoose";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
-import nodemailer from "nodemailer";
+import validator from 'validator';
 
 const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/ ";
 mongoose.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true });
@@ -44,8 +44,8 @@ const UserSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
-    minLength: 6
+    required: true
+    
   },
   email: {
     type: String,
@@ -72,33 +72,45 @@ const UserSchema = new mongoose.Schema({
 
 const User = mongoose.model("User", UserSchema);
 
-// CREATE REGISTRATION
+// CREATE REGISTRATION - Irro- // e mail går även att använda i login
 app.post("/register", async (req, res) => {
   const {username, password, email} = req.body;
 
-  try {
-const salt = bcrypt.genSaltSync();
-const newUser = await new User({
-  username: username,
-  email: email,
-  password: bcrypt.hashSync(password, salt)
-}).save();
-res.status(201).json({
-  success: true,
-  response: {
-    username: newUser.username,
-    id: newUser._id,
-    accessToken: newUser.accessToken
+  if (!validator.isEmail(email)) {
+    res.status(400).json({message: "Please enter a valid email address"});
+    return;
   }
-})
+
+  if (password.length < 6 || password.length > 20 ) {
+    res.status(400).json({ success: false, message: "Password must be between 6 and 20 characters"});
+    return;
+  }
+
+  try {
+    const salt = bcrypt.genSaltSync();
+    const newUser = await new User({
+      username: username,
+      email: email,
+      password: bcrypt.hashSync(password, salt)
+    }).save();
+    
+    res.status(201).json({
+      success: true,
+      response: {
+        username: newUser.username,
+        id: newUser._id,
+        accessToken: newUser.accessToken
+      }
+    });
   } catch (e) {
     res.status(400).json({
       success: false,
       response: e,
       message: "Could not create user"
-    })
+    });
   }
 });
+
 
 //LOGIN
 app.post("/login", async (req, res) => {
@@ -129,6 +141,8 @@ app.post("/login", async (req, res) => {
   }
 });
 
+
+// where do we put the preferences that we wanted to use for matching?
 app.get('/preferences', async (req, res) => {
   try {
     const users = await User.find();
