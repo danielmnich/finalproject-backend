@@ -8,7 +8,7 @@ import http from 'http';
 import { Server } from "socket.io";
 import multer from 'multer';
 import path from 'path';
-// import { match } from "assert";
+import listEndpoints from "express-list-endpoints";
 
 const app = express();
 const server = http.createServer(app);
@@ -17,6 +17,7 @@ const io = new Server(server);
 const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/mentorship ";
 mongoose.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true });
 mongoose.Promise = Promise;
+
 
 app.use(cors());
 app.use(express.json());
@@ -36,7 +37,8 @@ io.on('connection', (socket) => {
 });
 
 app.get("/", (req, res) => {
-  res.send("Hello Technigo!");
+  res.send(listEndpoints(app));
+
 });
 
 
