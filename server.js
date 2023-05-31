@@ -5,67 +5,36 @@ import crypto from "crypto";
 import bcrypt from "bcrypt";
 import validator from 'validator';
 import http from 'http';
-import { Server } from 'socket.io';
-
-const multer = require('multer');
-const path = require('path');
+import { Server } from "socket.io";
+import multer from 'multer';
+import path from 'path';
+// import { match } from "assert";
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/ ";
+const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/mentorship ";
 mongoose.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true });
 mongoose.Promise = Promise;
 
-
-
-/*
-/user/:userId - GET - get single user - doesn't matter if it's a mentee or a mentor Färdigt
-/user/:userId - PATCH - update single user - their preferences or whatever you need
-/user/:userId - DELETE - deletes single user
-/users - GET - get a list of users - here if you are a mentor you get a list of mentees if you are a mentee you get a list of mentors, additionally if you want to expand on that you can show only the users with matching preferences
-/match - PATCH - match a user - this can be done in 2 ways - either only one person decides, or both need to be interested and then it's a match */
-// preferences - GET - get a list of all preferences 
-
-// Defines the port the app will run on. Defaults to 8080, but can be overridden
-// when starting the server. Example command to overwrite PORT env variable value:
-// PORT=9000 npm start
-//const port = process.env.PORT || 8080;
-
-// Add middlewares to enable cors and json body parsing
 app.use(cors());
 app.use(express.json());
 
-
-// socket.io
 io.on('connection', (socket) => {
-  console.log('a user connected');
-  
-  socket.on('chat message', (msg) => {
-    console.log('message: ' + msg);
-    socket.emit('chat message', msg); // Echo the message back to the client
+  console.log('A user connected');
+
+  socket.on('customEvent', (data) => {
+    console.log('Received customEvent:', data);
   });
+
+  socket.emit('customEvent', { message: 'Hello client!' });
 
   socket.on('disconnect', () => {
-    console.log('user disconnected')
+    console.log('A user disconnected');
   });
 });
 
-// Emit events to clients: The server can send events 
-//to one or more connected clients at any time. 
-//This is how the server communicates with the clients.
-io.on('connection', socket => {
-  socket.on('chat message', msg => {
-      console.log('message: ' + msg);
-
-      // Echo the message back to the client
-      socket.emit('chat message', msg);
-  });
-});
-
-
-// Start defining your routes here
 app.get("/", (req, res) => {
   res.send("Hello Technigo!");
 });
@@ -76,9 +45,10 @@ const PreferenceSchema = new mongoose.Schema({
   preference: {
     type: String,
     required: true,
-    enum: ["mentor", "mentee", "fullstack", "frontend", "backend", "react", "javascript", "python", "java", "c++", "c#", "ruby", "php", "sql", "html", "css", "node", "angular", "vue", "swift", "kotlin", "flutter", "react native", "android", "ios", "unity"]
+    enum: ["fullstack", "frontend", "backend", "react", "javascript", "python", "java", "c++", "c#", "ruby", "php", "sql", "html", "css", "node", "angular", "vue", "swift", "kotlin", "flutter", "react native", "android", "ios", "unity"]
   }
 });
+const Preference = mongoose.model("Preference", PreferenceSchema);
 
 const UserSchema = new mongoose.Schema({
   username: {
@@ -109,8 +79,14 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
-  preferences: {
-    type: [PreferenceSchema],
+ preferences: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Preference",
+  }],
+  role: {
+    type: String,
+    enum: ["mentor", "mentee"],
+    required: true,
   },
   verificationToken: {
     type: String,
@@ -130,44 +106,53 @@ const User = mongoose.model("User", UserSchema);
 
 // CREATE REGISTRATION - Irro- // e mail går även att använda i login
 app.post("/register", async (req, res) => {
-  const {username, password, email, lastName, firstName} = req.body;
+  const { username, password, email, lastName, firstName, preferences, role } = req.body;
 
   if (!validator.isEmail(email)) {
-    res.status(400).json({message: "Please enter a valid email address"});
+    res.status(400).json({ message: "Please enter a valid email address" });
     return;
   }
 
-  if (password.length < 6 || password.length > 20 ) {
-    res.status(400).json({ success: false, message: "Password must be between 6 and 20 characters"});
+  if (password.length < 6 || password.length > 20) {
+    res.status(400).json({ success: false, message: "Password must be between 6 and 20 characters" });
     return;
   }
 
   try {
     const salt = bcrypt.genSaltSync();
+    const verificationToken = crypto.randomBytes(16).toString("hex"); // Generate a random verification token
+    const newPreferences = await Promise.all(preferences.map(async (preference) => {
+      return await new Preference({ preference }).save();
+    }));
+
     const newUser = await new User({
       username: username,
       email: email,
       firstName: firstName,
       lastName: lastName,
-      password: bcrypt.hashSync(password, salt)
+      password: bcrypt.hashSync(password, salt),
+      verificationToken: verificationToken, // Assign the verification token to the user
+      preferences: newPreferences.map((preference) => preference._id),
+      role: role,
     }).save();
-    
+
     res.status(201).json({
       success: true,
       response: {
         username: newUser.username,
         id: newUser._id,
-        accessToken: newUser.accessToken
-      }
+        accessToken: newUser.accessToken,
+      },
     });
   } catch (e) {
     res.status(400).json({
       success: false,
       response: e,
-      message: "Could not create user"
+      message: "Could not create user",
     });
   }
 });
+
 
 
 //LOGIN
@@ -295,6 +280,82 @@ app.delete("/user/:userId", async (req, res) => {
   }
 });
 
+// users - GET - get a list of users - 
+//here if you are a mentor you get a list of mentees if 
+//you are a mentee you get a list of mentors, 
+//additionally if you want to expand on that you can show only the users with matching preferences
+app.get('/users', async (req, res) => {
+  try {
+    const users = await User.find();
+    res.status(200).json({
+      success: true,
+      response: {
+        users: users
+      }
+    });
+  } catch (e) {
+    res.status(500).json({
+      success: false,
+      response: e
+    });
+  }
+});
+
+// add a GET request to match a mentor with a mentee and vice versa
+// /users/:userId/match - GET - get a list of users -
+app.get("/match", async (req, res) => {
+  try {
+    const mentors = await User.find({ role: "mentor" }).populate("preferences");
+    const mentees = await User.find({ role: "mentee" }).populate("preferences");
+    const matchedPairs = matchMentorsWithMentees(mentors, mentees);
+    res.status(200).json({
+      success: true,
+      response: {
+        matchedPairs: matchedPairs,
+      },
+    });
+  } catch (e) {
+    res.status(500).json({
+      success: false,
+      response: e,
+    });
+  }
+});
+
+// Matching Logic
+const matchMentorsWithMentees = (mentors, mentees) => {
+  const matchedPairs = [];
+
+  for (const mentor of mentors) {
+    let bestMatch = null;
+    let maxMatchScore = -Infinity;
+
+    for (const mentee of mentees) {
+      const matchScore = calculateMatchScore(mentor.preferences, mentee.preferences);
+
+      if (matchScore > maxMatchScore) {
+        bestMatch = mentee;
+        maxMatchScore = matchScore;
+      }
+    }
+
+    if (bestMatch) {
+      matchedPairs.push({ mentor, mentee: bestMatch });
+      mentees.splice(mentees.indexOf(bestMatch), 1);
+    }
+  }
+
+  return matchedPairs;
+};
+
+const calculateMatchScore = (mentorPreferences, menteePreferences) => {
+  const sharedPreferences = mentorPreferences.filter(p => menteePreferences.includes(p));
+  return sharedPreferences.length;
+};
+
+
+
+
 //  preferences - GET - get all preferences
 app.get('/preferences', async (req, res) => {
   try {
@@ -316,6 +377,7 @@ app.get('/preferences', async (req, res) => {
   }
 });
 
+// for profile picture upload
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, 'uploads/')
@@ -477,19 +539,29 @@ app.get("/bio", async (req, res) => {
 
 
 app.get("/bio", authenticateUser);
-app.get("/bio", async(req, res) => {
+app.get("/bio", async (req, res) => {
   try {
     const accessToken = req.header("Authorization");
-    const secrets = await Secret.find({});
-    res.status(200).json({
-      success: true, 
-      response: secrets
-    })
+    const user = await User.findOne({ accessToken: accessToken })
+
+    if (user) {
+      const bio = await Bio.find({ username: user._id }).sort({ createdAt: -1 }).limit(20)
+      res.status(200).json({
+        success: true,
+        response: bio,
+      });
+    } else {
+      res.status(401).json({
+        success: false,
+        response: "Please log in",
+        loggedOut: true,
+      });
+    }
   } catch (e) {
     res.status(500).json({
-      success: false, 
-      response: e, 
-      message: "Ground control... Abort Abort!"
+      success: false,
+      response: e,
+      message: "Ground control... Abort Abort!",
     });
   }
 });
@@ -500,13 +572,13 @@ app.post("/bio", async (req, res) => {
     const { message } = req.body;
     const accessToken = req.header("Authorization");
     const user = await User.findOne({accessToken: accessToken});
-    const secrets = await new Secret({
+    const bio = await new Bio({
       message: message, 
       username: user._id
     }).save();
     res.status(201).json({
       success: true, 
-      response: secrets
+      response: Bio
     })
   } catch (e) {
     res.status(500).json({
@@ -554,9 +626,8 @@ app.put("/bio", async (req, res) => {
 
 
 
+// start the server
 
-// Start the server
-const port = process.env.PORT || 8080;
-server.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
+server.listen(process.env.PORT || 8080, () => {
+  console.log(`Server is running on port ${process.env.PORT || 8080}`);
 });
