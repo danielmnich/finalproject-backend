@@ -4,15 +4,23 @@ import mongoose from "mongoose";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 import validator from 'validator';
+import http from 'http';
+import { Server } from 'socket.io';
+
 const multer = require('multer');
 const path = require('path');
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
 
 const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/ ";
 mongoose.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true });
 mongoose.Promise = Promise;
 
-/*/register - POST - pretty self-explanatory - Irro Färdigt- this is also create a user?
-/login - POST - as above(typ färdig) - Irro Färdigt
+
+
+/*
 /user/:userId - GET - get single user - doesn't matter if it's a mentee or a mentor Färdigt
 /user/:userId - PATCH - update single user - their preferences or whatever you need
 /user/:userId - DELETE - deletes single user
@@ -23,17 +31,45 @@ mongoose.Promise = Promise;
 // Defines the port the app will run on. Defaults to 8080, but can be overridden
 // when starting the server. Example command to overwrite PORT env variable value:
 // PORT=9000 npm start
-const port = process.env.PORT || 8080;
-const app = express();
+//const port = process.env.PORT || 8080;
 
 // Add middlewares to enable cors and json body parsing
 app.use(cors());
 app.use(express.json());
 
+
+// socket.io
+io.on('connection', (socket) => {
+  console.log('a user connected');
+  
+  socket.on('chat message', (msg) => {
+    console.log('message: ' + msg);
+    socket.emit('chat message', msg); // Echo the message back to the client
+  });
+
+  socket.on('disconnect', () => {
+    console.log('user disconnected')
+  });
+});
+
+// Emit events to clients: The server can send events 
+//to one or more connected clients at any time. 
+//This is how the server communicates with the clients.
+io.on('connection', socket => {
+  socket.on('chat message', msg => {
+      console.log('message: ' + msg);
+
+      // Echo the message back to the client
+      socket.emit('chat message', msg);
+  });
+});
+
+
 // Start defining your routes here
 app.get("/", (req, res) => {
   res.send("Hello Technigo!");
 });
+
 
 // user och preferences
 const PreferenceSchema = new mongoose.Schema({
@@ -386,7 +422,7 @@ const BioSchema = new mongoose.Schema({
   }
 });
 
-const Secret = mongoose.model("Bio", BioSchema);
+const Bio = mongoose.model("Bio", BioSchema);
 
 // Authenticate the user
 const authenticateUser = async (req, res, next) => {
@@ -520,6 +556,7 @@ app.put("/bio", async (req, res) => {
 
 
 // Start the server
-app.listen(port, () => {
+const port = process.env.PORT || 8080;
+server.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
 });
