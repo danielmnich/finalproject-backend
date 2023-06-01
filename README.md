@@ -1,4 +1,4 @@
-# Project Auth API
+# mentorship backend
 
 Replace this readme with your own information about your project.
 
@@ -11,9 +11,3 @@ Describe how you approached to problem, and what tools and techniques you used t
 ## View it live
 
 Every project should be deployed somewhere. Be sure to include the link to the deployed project so that the viewer can click around and see what it's all about.
-
-Frontend:
-https://calm-custard-0d2bb8.netlify.app/
-
-Backend:
-https://project-auth-3nbrs2gipa-lz.a.run.app/
