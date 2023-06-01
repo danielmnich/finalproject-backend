@@ -14,6 +14,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+
 const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/mentorship ";
 mongoose.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true });
 mongoose.Promise = Promise;
